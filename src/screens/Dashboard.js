@@ -1,98 +1,143 @@
-// filename: src/screens/Dashboard.js
-import React, { useContext } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import React, { useContext, useRef, useEffect } from "react";
+import { StyleSheet, View, ScrollView, Animated } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MoneyContext } from '../context/MoneyContext';
-import { LucideTrophy } from 'lucide-react-native';
+import { getAvatar } from '../utils/avatars';
+import { LESSONS } from '../data/lessons';
 
-const JarCard = ({ title, amount, color }) => (
-  <View style={[styles.card, { borderTopColor: color }]}>
-    <Text style={styles.cardTitle}>{title}</Text>
-    <Text style={styles.cardAmount}>${amount.toFixed(2)}</Text>
-  </View>
-);
+// CORRECTED IMPORTS (No more @ symbol)
+import { ThemedText } from '../components/ThemedText';
+import { BalanceCard } from '../components/BalanceCard';
 
-export default function Dashboard({ navigation }) {
-  const { wallet, stats, loading } = useContext(MoneyContext);
-  const totalNetWorth = wallet.spend + wallet.save + wallet.grow + wallet.give;
+export default function Dashboard() {
+  const insets = useSafeAreaInsets();
+  const { wallet, userProfile, theme, loading } = useContext(MoneyContext);
+  
+  // Animation Values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
-  const xpToNextLevel = 50;
-  const currentXP = stats.xp % xpToNextLevel;
-  const progressPercent = (currentXP / xpToNextLevel) * 100;
+  useEffect(() => {
+    Animated.timing(fadeAnim, { toValue: 1, duration: 800, useNativeDriver: true }).start();
+  }, []);
 
-  if (loading) return <View style={styles.center}><Text>Loading...</Text></View>;
+  if (loading || !userProfile) return null;
+
+  const avatar = getAvatar(userProfile.avatarId);
+  const totalBalance = wallet.spend + wallet.save + wallet.grow + wallet.give;
+  
+  // Calculate Progress
+  const completedLessons = LESSONS.filter(l => l.completed).length;
+  const nextLesson = LESSONS.find(l => !l.completed);
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Level {stats.level} Pilot 🚀</Text>
-          <Text style={styles.subHeader}>Net Worth: ${totalNetWorth.toFixed(2)}</Text>
+    <ScrollView
+      style={[styles.container, { backgroundColor: theme.bg }]}
+      contentContainerStyle={{
+        paddingTop: insets.top + 20,
+        paddingBottom: 100,
+        paddingHorizontal: 20,
+      }}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* 1. GREETING ROW */}
+      <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
+        <View style={styles.greetingText}>
+          <ThemedText type="body" color={theme.text} style={{opacity: 0.6}}>Welcome back,</ThemedText>
+          <ThemedText type="h1" color={theme.text}>{userProfile.name}</ThemedText>
         </View>
-        <View style={styles.xpCircle}>
-           <Text style={styles.xpText}>{stats.xp} XP</Text>
+        <View style={[styles.avatarContainer, { backgroundColor: avatar.bg }]}>
+          <ThemedText style={{fontSize: 30}}>{avatar.emoji}</ThemedText>
+        </View>
+      </Animated.View>
+
+      {/* 2. TOTAL BALANCE HERO CARD */}
+      <Animated.View style={[styles.section, { opacity: fadeAnim, transform: [{translateY: 0}] }]}>
+        <View style={[styles.totalCard, { backgroundColor: theme.primary + '15', borderColor: theme.primary + '30' }]}>
+          <ThemedText type="small" color={theme.text}>Total Balance</ThemedText>
+          <ThemedText type="hero" color={theme.primary}>${totalBalance.toFixed(2)}</ThemedText>
+        </View>
+      </Animated.View>
+
+      {/* 3. BALANCE GRID */}
+      <View style={styles.section}>
+        <View style={styles.balanceRow}>
+          <BalanceCard type="spend" amount={wallet.spend} />
+          <BalanceCard type="save" amount={wallet.save} />
+        </View>
+        <View style={styles.balanceRow}>
+          <BalanceCard type="grow" amount={wallet.grow} />
+          <BalanceCard type="give" amount={wallet.give} />
         </View>
       </View>
 
-      <View style={styles.xpContainer}>
-        <View style={styles.xpBarBackground}>
-          <View style={[styles.xpBarFill, { width: `${progressPercent}%` }]} />
+      {/* 4. PROGRESS SECTION */}
+      <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
+        <ThemedText type="h3" color={theme.text} style={styles.sectionTitle}>Your Progress</ThemedText>
+        
+        <View style={[styles.progressCard, { backgroundColor: theme.cardBg }]}>
+          <View style={styles.progressInfo}>
+            <ThemedText type="h2" color={theme.primary}>
+              {completedLessons}/{LESSONS.length}
+            </ThemedText>
+            <ThemedText type="small" color={theme.text}>Lessons completed</ThemedText>
+          </View>
+          
+          <View style={[styles.progressTrack, { backgroundColor: theme.bg }]}>
+            <View 
+              style={[
+                styles.progressBar, 
+                { 
+                  backgroundColor: theme.primary, 
+                  width: `${(completedLessons / LESSONS.length) * 100}%` 
+                }
+              ]} 
+            />
+          </View>
         </View>
-      </View>
+      </Animated.View>
 
-      <Text style={styles.sectionTitle}>Your Assets</Text>
-      <View style={styles.grid}>
-        <JarCard title="Spend" amount={wallet.spend} color="#FF7675" />
-        <JarCard title="Save" amount={wallet.save} color="#4ECDC4" />
-        <JarCard title="Grow" amount={wallet.grow} color="#FFE66D" />
-        <JarCard title="Give" amount={wallet.give} color="#FF9F43" />
-      </View>
+      {/* 5. NEXT LESSON CARD */}
+      {nextLesson && (
+        <Animated.View style={[styles.section, { opacity: fadeAnim }]}>
+          <ThemedText type="h3" color={theme.text} style={styles.sectionTitle}>Continue Learning</ThemedText>
+          <View style={[styles.lessonCard, { backgroundColor: theme.cardBg }]}>
+            <View style={[styles.lessonIcon, { backgroundColor: theme.secondary + '20' }]}>
+              <ThemedText style={{fontSize: 24}}>{nextLesson.icon}</ThemedText>
+            </View>
+            <View style={styles.lessonContent}>
+              <ThemedText type="h4" color={theme.text}>{nextLesson.title}</ThemedText>
+              <ThemedText type="small" color={theme.text} numberOfLines={1}>{nextLesson.description}</ThemedText>
+            </View>
+            <View style={[styles.startBtn, { backgroundColor: theme.primary }]}>
+              <ThemedText type="small" color="white" style={{fontWeight:'bold'}}>GO</ThemedText>
+            </View>
+          </View>
+        </Animated.View>
+      )}
 
-      <View style={styles.banner}>
-        <LucideTrophy color="white" size={24} />
-        <View style={{marginLeft: 10, flex: 1}}>
-          <Text style={styles.bannerTitle}>Current Mission:</Text>
-          <Text style={styles.bannerSub}>Save $50 in your Grow Jar to unlock the 'Saver' badge!</Text>
-        </View>
-      </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F7F9FC', padding: 20 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { marginTop: 10, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  greeting: { fontSize: 24, fontWeight: 'bold', color: '#2D3436' },
-  subHeader: { fontSize: 16, color: '#636E72', marginTop: 5 },
-  xpCircle: { backgroundColor: '#dfe6e9', padding: 10, borderRadius: 20 },
-  xpText: { fontWeight: 'bold', color: '#636E72', fontSize: 12 },
+  container: { flex: 1 },
+  section: { marginBottom: 24 },
+  sectionTitle: { marginBottom: 12 },
   
-  xpContainer: { marginBottom: 25 },
-  xpBarBackground: { height: 8, backgroundColor: '#dfe6e9', borderRadius: 4, overflow: 'hidden' },
-  xpBarFill: { height: '100%', backgroundColor: '#0984E3' },
-
-  sectionTitle: { fontSize: 18, fontWeight: '700', marginBottom: 15, color: '#2D3436' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  card: { 
-    width: '48%', 
-    backgroundColor: 'white', 
-    padding: 20, 
-    borderRadius: 16, 
-    marginBottom: 15,
-    borderTopWidth: 4,
-    elevation: 2
-  },
-  cardTitle: { color: '#B2BEC3', fontWeight: 'bold', fontSize: 14, marginBottom: 5 },
-  cardAmount: { fontSize: 24, fontWeight: 'bold', color: '#2D3436' },
-
-  banner: {
-    backgroundColor: '#6C5CE7',
-    borderRadius: 16,
-    padding: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 40
-  },
-  bannerTitle: { color: 'white', fontWeight: 'bold', fontSize: 16 },
-  bannerSub: { color: 'rgba(255,255,255,0.8)', fontSize: 12, flexWrap: 'wrap' }
+  greetingText: { flex: 1 },
+  avatarContainer: { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center' },
+  
+  totalCard: { padding: 24, borderRadius: 24, borderWidth: 1, alignItems: 'center' },
+  
+  balanceRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
+  
+  progressCard: { padding: 20, borderRadius: 20, elevation: 1 },
+  progressInfo: { marginBottom: 12 },
+  progressTrack: { height: 8, borderRadius: 4, overflow: 'hidden' },
+  progressBar: { height: '100%', borderRadius: 4 },
+  
+  lessonCard: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 20, elevation: 1 },
+  lessonIcon: { width: 48, height: 48, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
+  lessonContent: { flex: 1 },
+  startBtn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 }
 });
